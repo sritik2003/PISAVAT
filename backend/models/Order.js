@@ -9,7 +9,11 @@ const orderItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true },
   image: { type: String },
-  weight: { type: String, default: '100g' }
+  weight: { type: String, default: '100g' },
+  seller: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
 });
 
 const orderSchema = new mongoose.Schema(
@@ -52,6 +56,10 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
       default: 0.0
+    },
+    coupon: {
+      code: { type: String, default: '' },
+      discountAmount: { type: Number, default: 0 }
     },
     totalAmount: {
       type: Number,

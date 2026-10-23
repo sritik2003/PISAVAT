@@ -26,8 +26,21 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
-      default: 'user'
+      enum: ['buyer', 'seller', 'admin', 'user'],
+      default: 'buyer'
+    },
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'on_hold'],
+      default: 'active'
+    },
+    statusReason: {
+      type: String,
+      default: ''
+    },
+    storeName: {
+      type: String,
+      default: ''
     },
     phone: {
       type: String,
@@ -38,7 +51,13 @@ const userSchema = new mongoose.Schema(
       city: { type: String, default: '' },
       state: { type: String, default: '' },
       pincode: { type: String, default: '' }
-    }
+    },
+    wishlist: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product'
+      }
+    ]
   },
   {
     timestamps: true

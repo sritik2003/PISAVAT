@@ -1,6 +1,7 @@
 import Order from '../models/Order.js';
+import Product from '../models/Product.js';
 
-// @desc    Create new order
+// @desc    Create new order (with coupon support)
 // @route   POST /api/orders
 // @access  Public (or Private with optional user)
 export const createOrder = async (req, res, next) => {
@@ -14,6 +15,7 @@ export const createOrder = async (req, res, next) => {
       paymentMethod,
       itemsPrice,
       shippingPrice,
+      coupon,
       totalAmount,
       notes
     } = req.body;
@@ -32,18 +34,40 @@ export const createOrder = async (req, res, next) => {
       });
     }
 
+    // Populate seller reference for each item if not provided
+    const itemsWithSeller = await Promise.all(
+      orderItems.map(async (item) => {
+        let sellerId = item.seller;
+        if (!sellerId && item.product) {
+          const prod = await Product.findById(item.product);
+          if (prod && prod.seller) {
+            sellerId = prod.seller;
+          }
+        }
+        return {
+          ...item,
+          seller: sellerId || undefined
+        };
+      })
+    );
+
     const order = new Order({
       user: req.user ? req.user._id : null,
       customerName,
       customerEmail,
       customerPhone,
-      orderItems,
+      orderItems: itemsWithSeller,
       shippingAddress,
       paymentMethod: paymentMethod || 'COD',
-      itemsPrice: itemsPrice || 0,
-      shippingPrice: shippingPrice || 0,
-      totalAmount: totalAmount || itemsPrice,
-      notes: notes || ''
+      itemsPrice: Number(itemsPrice) || 0,
+      shippingPrice: Number(shippingPrice) || 0,
+      coupon: {
+        code: coupon?.code || '',
+        discountAmount: Number(coupon?.discountAmount) || 0
+      },
+      totalAmount: Number(totalAmount) || 0,
+      notes: notes || '',
+      orderStatus: 'Placed'
     });
 
     const createdOrder = await order.save();
@@ -76,7 +100,7 @@ export const getMyOrders = async (req, res, next) => {
 
 // @desc    Get order by ID
 // @route   GET /api/orders/:id
-// @access  Private / Public with match
+// @access  Private / Public
 export const getOrderById = async (req, res, next) => {
   try {
     const order = await Order.findById(req.params.id).populate('user', 'name email phone');
@@ -96,12 +120,12 @@ export const getOrderById = async (req, res, next) => {
   }
 };
 
-// @desc    Get all orders
+// @desc    Get all orders (Admin)
 // @route   GET /api/orders
 // @access  Private/Admin
 export const getAllOrders = async (req, res, next) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 }).populate('user', 'name email');
+    const orders = await Order.find().sort({ createdAt: -1 }).populate('user', 'name email phone');
     return res.status(200).json({
       success: true,
       count: orders.length,
@@ -114,7 +138,7 @@ export const getAllOrders = async (req, res, next) => {
 
 // @desc    Update order status
 // @route   PATCH /api/orders/:id/status
-// @access  Private/Admin
+// @access  Private (Admin or Seller)
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { orderStatus } = req.body;
@@ -132,7 +156,7 @@ export const updateOrderStatus = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Order status updated',
+      message: `Order status updated to ${order.orderStatus}`,
       order: updatedOrder
     });
   } catch (error) {

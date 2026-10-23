@@ -7,13 +7,15 @@ import {
   User, 
   ArrowRight, 
   CheckCircle2, 
-  AlertCircle,
-  Sparkles,
-  ShieldCheck,
-  KeyRound,
-  LogOut,
-  X,
-  Phone
+  AlertCircle, 
+  Sparkles, 
+  ShieldCheck, 
+  KeyRound, 
+  LogOut, 
+  X, 
+  Phone,
+  Store,
+  ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
@@ -51,6 +53,8 @@ export default function AuthPortal() {
     phone: '',
     password: '',
     confirmPassword: '',
+    role: 'buyer', // 'buyer' or 'seller'
+    storeName: '',
     rememberMe: false,
     agreeTerms: true
   });
@@ -59,7 +63,7 @@ export default function AuthPortal() {
 
   const showToastMsg = (message, type = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
   const handleInputChange = (e) => {
@@ -69,23 +73,6 @@ export default function AuthPortal() {
       [name]: type === 'checkbox' ? checked : value
     }));
   };
-
-  // Password strength check
-  const getPasswordStrength = (pass) => {
-    if (!pass) return { score: 0, label: '', color: 'bg-slate-700' };
-    let score = 0;
-    if (pass.length >= 6) score++;
-    if (pass.length >= 8) score++;
-    if (/[A-Z]/.test(pass)) score++;
-    if (/[0-9]/.test(pass)) score++;
-
-    if (score <= 1) return { score: 25, label: 'Weak', color: 'bg-rose-500' };
-    if (score === 2) return { score: 50, label: 'Fair', color: 'bg-amber-500' };
-    if (score === 3) return { score: 75, label: 'Good', color: 'bg-blue-500' };
-    return { score: 100, label: 'Strong', color: 'bg-emerald-500' };
-  };
-
-  const strength = getPasswordStrength(formData.password);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -111,8 +98,15 @@ export default function AuthPortal() {
           setIsLoading(false);
           return;
         }
-        await register(formData.name, formData.email, formData.password, formData.phone);
-        showToastMsg('Account registered and synced in MongoDB!');
+        await register(
+          formData.name,
+          formData.email,
+          formData.password,
+          formData.phone,
+          formData.role,
+          formData.storeName
+        );
+        showToastMsg(`Registered successfully as ${formData.role.toUpperCase()}!`);
       } else {
         // Forgot password
         const res = await authAPI.forgotPassword(formData.email);
@@ -126,13 +120,19 @@ export default function AuthPortal() {
     }
   };
 
-  // Quick Demo Autofill handler
-  const handleDemoFill = (role) => {
-    if (role === 'admin') {
+  // Quick 1-Click Demo Fill handler
+  const handleDemoFill = (roleType) => {
+    if (roleType === 'admin') {
       setFormData(prev => ({
         ...prev,
         email: 'admin@pisawat.com',
         password: 'adminPassword123'
+      }));
+    } else if (roleType === 'seller') {
+      setFormData(prev => ({
+        ...prev,
+        email: 'seller@pisawat.com',
+        password: 'sellerPassword123'
       }));
     } else {
       setFormData(prev => ({
@@ -148,12 +148,12 @@ export default function AuthPortal() {
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-xs sm:text-sm border backdrop-blur-md transition-all animate-bounce ${
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-2xl text-xs sm:text-sm border backdrop-blur-md transition-all animate-bounce max-w-md ${
           toast.type === 'error' 
-            ? 'bg-rose-950/90 border-rose-800 text-rose-200' 
-            : 'bg-emerald-950/90 border-emerald-800 text-emerald-200'
+            ? 'bg-rose-950/95 border-rose-700 text-rose-200' 
+            : 'bg-emerald-950/95 border-emerald-700 text-emerald-200'
         }`}>
-          {toast.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400" /> : <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+          {toast.type === 'error' ? <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />}
           <span>{toast.message}</span>
         </div>
       )}
@@ -162,7 +162,7 @@ export default function AuthPortal() {
       <div className="w-full max-w-md relative z-10 my-8">
         
         {/* Card Box */}
-        <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative">
+        <div className="bg-slate-900/95 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative">
           
           {/* Close button */}
           <button
@@ -183,45 +183,107 @@ export default function AuthPortal() {
               {view === 'forgot' && "Reset Password 🔑"}
             </h2>
             <p className="text-slate-400 text-xs mt-1">
-              {view === 'login' && "Sign in to access your Pisawat Spices account & orders."}
-              {view === 'signup' && "Join us for stone-ground, pure Indian spices."}
+              {view === 'login' && "Sign in to access your Pisawat account, track orders or store."}
+              {view === 'signup' && "Choose your role as Buyer or Seller to get started."}
               {view === 'forgot' && "Enter your email to receive password reset instructions."}
             </p>
           </div>
 
-          {/* Quick Demo Fill Buttons */}
+          {/* 3-ROLE 1-CLICK DEMO BUTTONS */}
           {view === 'login' && (
-            <div className="mb-4 p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold block mb-1.5">
-                ⚡ 1-Click Test Credentials (Pre-seeded in MongoDB)
+            <div className="mb-4 p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-center space-y-2">
+              <span className="text-[10px] text-amber-400 uppercase tracking-wider font-bold block">
+                ⚡ 1-Click Fast Login by Role:
               </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDemoFill('user')}
-                  className="py-1 px-2 text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg border border-slate-700 font-medium transition"
-                >
-                  Customer Demo
-                </button>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => handleDemoFill('admin')}
-                  className="py-1 px-2 text-[11px] bg-slate-800 hover:bg-slate-700 text-indigo-400 rounded-lg border border-slate-700 font-medium transition"
+                  className="py-1.5 px-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  Admin Demo
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Admin</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoFill('seller')}
+                  className="py-1.5 px-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Store className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Seller</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDemoFill('buyer')}
+                  className="py-1.5 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Buyer</span>
                 </button>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            
-            {/* Full Name field (For Signup only) */}
+          {/* FORM */}
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {/* ROLE SELECTOR FOR REGISTRATION */}
+            {view === 'signup' && (
+              <div className="space-y-1.5">
+                <label className="text-gray-300 font-semibold block">Select Your Role:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(p => ({ ...p, role: 'buyer' }))}
+                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 transition cursor-pointer ${
+                      formData.role === 'buyer'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Buyer / Customer</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData(p => ({ ...p, role: 'seller' }))}
+                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-2 transition cursor-pointer ${
+                      formData.role === 'seller'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                        : 'bg-gray-950 border-gray-800 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Store className="w-4 h-4" />
+                    <span>Seller / Merchant</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Seller Store Name input */}
+            {view === 'signup' && formData.role === 'seller' && (
+              <div>
+                <label className="text-gray-300 font-semibold block mb-1">Store / Business Name *</label>
+                <input
+                  type="text"
+                  name="storeName"
+                  required
+                  value={formData.storeName}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Royal Pisawat Spice Depot"
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl px-3 py-2.5 outline-none transition"
+                />
+              </div>
+            )}
+
+            {/* Name input on Signup */}
             {view === 'signup' && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Full Name *</label>
+                <label className="text-gray-300 font-semibold block mb-1">Full Name *</label>
                 <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     type="text"
                     name="name"
@@ -229,64 +291,64 @@ export default function AuthPortal() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="e.g. Aman Sharma"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl pl-9 pr-3 py-2.5 outline-none transition"
                   />
                 </div>
               </div>
             )}
 
-            {/* Phone (For Signup) */}
-            {view === 'signup' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Phone Number</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+91 9876543210"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Email Field */}
+            {/* Email input */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Email Address *</label>
+              <label className="text-gray-300 font-semibold block mb-1">Email Address *</label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                 <input
                   type="email"
                   name="email"
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="name@domain.com"
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition"
+                  placeholder="e.g. user@pisawat.com"
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl pl-9 pr-3 py-2.5 outline-none transition font-mono"
                 />
               </div>
             </div>
 
-            {/* Password Field */}
+            {/* Phone on Signup */}
+            {view === 'signup' && (
+              <div>
+                <label className="text-gray-300 font-semibold block mb-1">Mobile Phone</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="+91 9811223344"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl pl-9 pr-3 py-2.5 outline-none transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Password input */}
             {view !== 'forgot' && (
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-medium text-slate-300">Password *</label>
+                  <label className="text-gray-300 font-semibold">Password *</label>
                   {view === 'login' && (
                     <button
                       type="button"
                       onClick={() => setView('forgot')}
-                      className="text-[11px] font-medium text-amber-400 hover:text-amber-300 transition"
+                      className="text-[11px] text-amber-400 hover:underline cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
@@ -294,41 +356,25 @@ export default function AuthPortal() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-10 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl pl-9 pr-10 py-2.5 outline-none transition"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-3 top-3 text-slate-500 hover:text-white"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-
-                {/* Password Strength meter (Signup only) */}
-                {view === 'signup' && formData.password && (
-                  <div className="mt-1.5 space-y-1">
-                    <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-300 ${strength.color}`} 
-                        style={{ width: `${strength.score}%` }} 
-                      />
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-slate-400">
-                      <span>Strength:</span>
-                      <span className="font-semibold text-slate-300">{strength.label}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Confirm Password (For Signup) */}
+            {/* Confirm Password on Signup */}
             {view === 'signup' && (
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Confirm Password *</label>
+                <label className="text-gray-300 font-semibold block mb-1">Confirm Password *</label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     name="confirmPassword"
@@ -336,12 +382,12 @@ export default function AuthPortal() {
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-10 pr-10 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700 focus:border-amber-500 text-white rounded-xl pl-9 pr-10 py-2.5 outline-none transition"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-3 top-3 text-slate-500 hover:text-white"
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -349,37 +395,20 @@ export default function AuthPortal() {
               </div>
             )}
 
-            {/* Checkboxes */}
-            {view === 'signup' && (
-              <div className="flex items-start pt-1">
-                <input
-                  type="checkbox"
-                  id="agreeTerms"
-                  name="agreeTerms"
-                  checked={formData.agreeTerms}
-                  onChange={handleInputChange}
-                  className="w-3.5 h-3.5 mt-0.5 rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-amber-500"
-                />
-                <label htmlFor="agreeTerms" className="ml-2 text-[11px] text-slate-400 cursor-pointer">
-                  I agree to Pisawat Terms and Food Safety policy.
-                </label>
-              </div>
-            )}
-
             {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black rounded-xl font-bold text-xs sm:text-sm transition duration-200 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer mt-3 disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20 transition cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                <span>Processing...</span>
               ) : (
                 <>
                   <span>
-                    {view === 'login' && "Sign In with MongoDB"}
-                    {view === 'signup' && "Create Account"}
-                    {view === 'forgot' && "Send Reset Link"}
+                    {view === 'login' && 'Sign In'}
+                    {view === 'signup' && `Create ${formData.role.toUpperCase()} Account`}
+                    {view === 'forgot' && 'Send Reset Link'}
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
@@ -387,42 +416,30 @@ export default function AuthPortal() {
             </button>
           </form>
 
-          {/* Footer View Switcher */}
-          <div className="mt-5 pt-3 border-t border-slate-800/80 text-center text-xs text-slate-400">
-            {view === 'login' && (
+          {/* Toggle View Footer */}
+          <div className="mt-5 text-center text-xs text-slate-400 border-t border-slate-800 pt-4">
+            {view === 'login' ? (
               <p>
-                Don't have an account?{' '}
+                Don't have an account yet?{' '}
                 <button
                   type="button"
                   onClick={() => setView('signup')}
-                  className="text-amber-400 hover:text-amber-300 font-semibold transition ml-1"
+                  className="text-amber-400 font-bold hover:underline cursor-pointer"
                 >
-                  Sign up now
+                  Register Now
                 </button>
               </p>
-            )}
-
-            {view === 'signup' && (
+            ) : (
               <p>
                 Already have an account?{' '}
                 <button
                   type="button"
                   onClick={() => setView('login')}
-                  className="text-amber-400 hover:text-amber-300 font-semibold transition ml-1"
+                  className="text-amber-400 font-bold hover:underline cursor-pointer"
                 >
-                  Log in
+                  Sign In
                 </button>
               </p>
-            )}
-
-            {view === 'forgot' && (
-              <button
-                type="button"
-                onClick={() => setView('login')}
-                className="text-amber-400 hover:text-amber-300 font-semibold transition"
-              >
-                ← Back to login
-              </button>
             )}
           </div>
 

@@ -49,10 +49,10 @@ export const authAPI = {
     });
   },
 
-  register: async (name, email, password, phone = '') => {
+  register: async (name, email, password, phone = '', role = 'buyer', storeName = '') => {
     return await request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, phone })
+      body: JSON.stringify({ name, email, password, phone, role, storeName })
     });
   },
 
@@ -72,6 +72,14 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify({ email })
     });
+  },
+
+  getWishlist: async () => {
+    return await request('/auth/wishlist', { method: 'GET' }, true);
+  },
+
+  toggleWishlist: async (productId) => {
+    return await request(`/auth/wishlist/${productId}`, { method: 'POST' }, true);
   }
 };
 
@@ -118,6 +126,126 @@ export const orderAPI = {
 
   getById: async (id) => {
     return await request(`/orders/${id}`, { method: 'GET' });
+  },
+
+  getAll: async () => {
+    return await request('/orders', { method: 'GET' }, true);
+  },
+
+  updateStatus: async (id, orderStatus) => {
+    return await request(`/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ orderStatus })
+    }, true);
+  }
+};
+
+// Coupons API
+export const couponAPI = {
+  apply: async (code, cartTotal) => {
+    return await request('/coupons/apply', {
+      method: 'POST',
+      body: JSON.stringify({ code, cartTotal })
+    });
+  },
+
+  getAll: async () => {
+    const token = localStorage.getItem('pisawat_token');
+    return await request('/coupons', { method: 'GET' }, !!token);
+  },
+
+  create: async (couponData) => {
+    return await request('/coupons', {
+      method: 'POST',
+      body: JSON.stringify(couponData)
+    }, true);
+  },
+
+  toggleStatus: async (id) => {
+    return await request(`/coupons/${id}/toggle`, {
+      method: 'PATCH'
+    }, true);
+  },
+
+  delete: async (id) => {
+    return await request(`/coupons/${id}`, {
+      method: 'DELETE'
+    }, true);
+  }
+};
+
+// Seller API
+export const sellerAPI = {
+  getProducts: async () => {
+    return await request('/seller/products', { method: 'GET' }, true);
+  },
+
+  createProduct: async (productData) => {
+    return await request('/seller/products', {
+      method: 'POST',
+      body: JSON.stringify(productData)
+    }, true);
+  },
+
+  updateProduct: async (id, productData) => {
+    return await request(`/seller/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(productData)
+    }, true);
+  },
+
+  deleteProduct: async (id) => {
+    return await request(`/seller/products/${id}`, {
+      method: 'DELETE'
+    }, true);
+  },
+
+  getOrders: async () => {
+    return await request('/seller/orders', { method: 'GET' }, true);
+  },
+
+  updateOrderStatus: async (id, orderStatus) => {
+    return await request(`/seller/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ orderStatus })
+    }, true);
+  },
+
+  getStats: async () => {
+    return await request('/seller/stats', { method: 'GET' }, true);
+  }
+};
+
+// Admin API
+export const adminAPI = {
+  getUsers: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const endpoint = queryString ? `/admin/users?${queryString}` : '/admin/users';
+    return await request(endpoint, { method: 'GET' }, true);
+  },
+
+  updateUserStatus: async (id, status, reason = '') => {
+    return await request(`/admin/users/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, reason })
+    }, true);
+  },
+
+  updateUserRole: async (id, role) => {
+    return await request(`/admin/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role })
+    }, true);
+  },
+
+  deleteUser: async (id) => {
+    return await request(`/admin/users/${id}`, {
+      method: 'DELETE'
+    }, true);
+  },
+
+  getStats: async () => {
+    return await request('/admin/stats', { method: 'GET' }, true);
   }
 };
 

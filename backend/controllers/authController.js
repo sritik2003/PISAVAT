@@ -10,12 +10,12 @@ const generateToken = (id) => {
   );
 };
 
-// @desc    Register a new user
+// @desc    Register a new user (buyer or seller)
 // @route   POST /api/auth/register
 // @access  Public
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, role, storeName } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -33,27 +33,35 @@ export const registerUser = async (req, res, next) => {
       });
     }
 
+    const assignedRole = role === 'seller' ? 'seller' : (role === 'admin' ? 'admin' : 'buyer');
+
     // Create user
     const user = await User.create({
       name,
       email: email.toLowerCase(),
       password,
-      phone: phone || ''
+      phone: phone || '',
+      role: assignedRole,
+      storeName: assignedRole === 'seller' ? (storeName || `${name}'s Spices`) : '',
+      status: 'active'
     });
 
     const token = generateToken(user._id);
 
     return res.status(201).json({
       success: true,
-      message: 'Account created successfully',
+      message: `${assignedRole.toUpperCase()} account created successfully`,
       token,
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
+        status: user.status,
         phone: user.phone,
-        address: user.address
+        storeName: user.storeName,
+        address: user.address,
+        wishlist: user.wishlist
       }
     });
   } catch (error) {
@@ -84,6 +92,15 @@ export const loginUser = async (req, res, next) => {
       });
     }
 
+    // Check status: suspended or on hold
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        accountStatus: 'suspended',
+        message: 'Your account has been SUSPENDED by the Administrator. Please contact support@pisawat.com'
+      });
+    }
+
     // Check password
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
@@ -103,9 +120,12 @@ export const loginUser = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role === 'user' ? 'buyer' : user.role,
+        status: user.status,
         phone: user.phone,
-        address: user.address
+        storeName: user.storeName,
+        address: user.address,
+        wishlist: user.wishlist || []
       }
     });
   } catch (error) {
@@ -118,7 +138,7 @@ export const loginUser = async (req, res, next) => {
 // @access  Private
 export const getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user._id).select('-password').populate('wishlist');
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -128,7 +148,10 @@ export const getMe = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      user
+      user: {
+        ...user.toObject(),
+        role: user.role === 'user' ? 'buyer' : user.role
+      }
     });
   } catch (error) {
     next(error);
@@ -150,6 +173,7 @@ export const updateProfile = async (req, res, next) => {
 
     user.name = req.body.name || user.name;
     user.phone = req.body.phone !== undefined ? req.body.phone : user.phone;
+    if (req.body.storeName) user.storeName = req.body.storeName;
 
     if (req.body.address) {
       user.address = {
@@ -171,10 +195,70 @@ export const updateProfile = async (req, res, next) => {
         _id: updatedUser._id,
         name: updatedUser.name,
         email: updatedUser.email,
-        role: updatedUser.role,
+        role: updatedUser.role === 'user' ? 'buyer' : updatedUser.role,
+        status: updatedUser.status,
         phone: updatedUser.phone,
+        storeName: updatedUser.storeName,
         address: updatedUser.address
       }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle item in wishlist
+// @route   POST /api/auth/wishlist/:productId
+// @access  Private
+export const toggleWishlist = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const existsIndex = user.wishlist.findIndex(
+      (id) => id.toString() === productId.toString()
+    );
+
+    let isAdded = false;
+    if (existsIndex > -1) {
+      user.wishlist.splice(existsIndex, 1);
+      isAdded = false;
+    } else {
+      user.wishlist.push(productId);
+      isAdded = true;
+    }
+
+    await user.save();
+    await user.populate('wishlist');
+
+    return res.status(200).json({
+      success: true,
+      message: isAdded ? 'Added to wishlist' : 'Removed from wishlist',
+      isAdded,
+      wishlist: user.wishlist
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get user wishlist
+// @route   GET /api/auth/wishlist
+// @access  Private
+export const getWishlist = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).populate('wishlist');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      wishlist: user.wishlist || []
     });
   } catch (error) {
     next(error);
@@ -196,7 +280,6 @@ export const forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      // For security, don't reveal if email doesn't exist
       return res.status(200).json({
         success: true,
         message: 'If an account exists with this email, a password reset link has been dispatched.'

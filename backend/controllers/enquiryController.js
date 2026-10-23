@@ -8,6 +8,7 @@ export const createEnquiry = async (req, res, next) => {
     const { name, email, phone, companyName, productInterest, quantity, message } = req.body;
 
     if (!name || !email || !phone || !message) {
+      
       return res.status(400).json({
         success: false,
         message: 'Please provide name, email, phone, and message'

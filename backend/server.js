@@ -11,6 +11,9 @@ import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import enquiryRoutes from './routes/enquiryRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import couponRoutes from './routes/couponRoutes.js';
+import sellerRoutes from './routes/sellerRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,19 +40,25 @@ app.use(morgan('dev'));
 app.get('/', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    service: 'Pisawat Spices Backend API',
+    service: 'Pisawat Spices Multi-Role E-Commerce Backend API',
     database: 'MongoDB',
+    roles: ['buyer', 'seller', 'admin'],
     timestamp: new Date().toISOString()
   });
 });
 
-
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/enquiries', enquiryRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/api/seller', sellerRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error Handling Middleware
 app.use(notFound);

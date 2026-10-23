@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Check, X, ShieldCheck, HeartHandshake } from 'lucide-react';
+import { ShoppingCart, Check, X, ShieldCheck, HeartHandshake, Heart, Store } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProductModal({ product, onClose }) {
   if (!product) return null;
 
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useAuth();
   const price = product.price || 99;
+  const inWishlist = isInWishlist(product._id || product.slug || product.id);
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
@@ -26,20 +29,36 @@ export default function ProductModal({ product, onClose }) {
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
       <div className="bg-[#12151c] border border-gray-800 max-w-lg w-full rounded-2xl p-6 relative max-h-[90vh] overflow-y-auto shadow-2xl my-8">
         
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-full hover:bg-gray-800 transition cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Top Actions: Wishlist & Close */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+          <button
+            onClick={() => toggleWishlist(product)}
+            className={`p-2 rounded-full backdrop-blur-md transition cursor-pointer ${
+              inWishlist
+                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40'
+                : 'bg-black/60 text-gray-300 hover:text-rose-400 hover:bg-black/80'
+            }`}
+            title={inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          >
+            <Heart className={`w-4 h-4 ${inWishlist ? 'fill-current' : ''}`} />
+          </button>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-white p-2 rounded-full bg-black/60 hover:bg-black/80 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Product Image */}
         <div className="w-full h-48 overflow-hidden rounded-xl mb-4 border border-white/10 relative">
           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+          <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[10px] text-amber-400 font-semibold flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             FSSAI Lic: 20826004001943
+          </div>
+          <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[11px] text-amber-300 font-bold">
+            ★ {product.rating || 4.8} ({product.reviewsCount || 24} reviews)
           </div>
         </div>
 
@@ -50,6 +69,10 @@ export default function ProductModal({ product, onClose }) {
             <p className={`text-xs font-semibold ${product.textColor || 'text-amber-400'}`}>
               {product.subTitle}
             </p>
+            <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-1">
+              <Store className="w-3.5 h-3.5 text-amber-400" />
+              <span>Seller: <strong className="text-gray-200">{product.sellerName || 'Pisawat Official Spices'}</strong></span>
+            </div>
           </div>
           <div className="text-right">
             <div className="text-xl font-black text-amber-400">₹{price}</div>
@@ -111,14 +134,14 @@ export default function ProductModal({ product, onClose }) {
             <div className="flex items-center space-x-3 bg-gray-900 border border-gray-800 rounded-xl px-2 py-1">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-6 h-6 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs"
+                className="w-6 h-6 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs cursor-pointer"
               >
                 -
               </button>
               <span className="text-xs font-bold text-white px-1">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="w-6 h-6 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs"
+                className="w-6 h-6 rounded bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs cursor-pointer"
               >
                 +
               </button>

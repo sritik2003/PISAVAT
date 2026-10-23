@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Product from '../models/Product.js';
 import Enquiry from '../models/Enquiry.js';
+import Coupon from '../models/Coupon.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -186,31 +187,55 @@ export const seedDatabase = async () => {
       await mongoose.connect(mongoUri);
     }
 
-    console.log('🔄 Checking database initial state...');
+    console.log('🔄 Checking database initial state for 3 Roles & Multi-Vendor Setup...');
 
-    // Seed Admin User if not exists
+    // 1. Seed Admin User
     const adminEmail = 'admin@pisawat.com';
-    const adminExists = await User.findOne({ email: adminEmail });
-    if (!adminExists) {
-      await User.create({
-        name: 'Pisawat Admin',
+    let adminUser = await User.findOne({ email: adminEmail });
+    if (!adminUser) {
+      adminUser = await User.create({
+        name: 'Pisawat Master Admin',
         email: adminEmail,
         password: 'adminPassword123',
         role: 'admin',
+        status: 'active',
         phone: '+91 9876543210'
       });
       console.log('👑 Admin user created: admin@pisawat.com / adminPassword123');
     }
 
-    // Seed Demo User if not exists
+    // 2. Seed Seller User
+    const sellerEmail = 'seller@pisawat.com';
+    let sellerUser = await User.findOne({ email: sellerEmail });
+    if (!sellerUser) {
+      sellerUser = await User.create({
+        name: 'Rohit Sharma (Seller)',
+        email: sellerEmail,
+        password: 'sellerPassword123',
+        role: 'seller',
+        status: 'active',
+        storeName: 'Royal Pisawat Spices',
+        phone: '+91 9822334455',
+        address: {
+          street: 'Shop 14, Grain & Spice Market',
+          city: 'Khari Baoli, Delhi',
+          state: 'Delhi',
+          pincode: '110006'
+        }
+      });
+      console.log('🏪 Seller user created: seller@pisawat.com / sellerPassword123');
+    }
+
+    // 3. Seed Buyer User
     const demoEmail = 'user@pisawat.com';
-    const demoExists = await User.findOne({ email: demoEmail });
-    if (!demoExists) {
-      await User.create({
-        name: 'Aman Sharma',
+    let demoUser = await User.findOne({ email: demoEmail });
+    if (!demoUser) {
+      demoUser = await User.create({
+        name: 'Aman Sharma (Buyer)',
         email: demoEmail,
         password: 'password123',
-        role: 'user',
+        role: 'buyer',
+        status: 'active',
         phone: '+91 9811223344',
         address: {
           street: '145 Gali No 3, Roshan Nagar',
@@ -219,19 +244,72 @@ export const seedDatabase = async () => {
           pincode: '121003'
         }
       });
-      console.log('👤 Demo user created: user@pisawat.com / password123');
+      console.log('🛒 Buyer user created: user@pisawat.com / password123');
     }
 
-    // Seed Products if none exist
+    // 4. Seed Products if none exist or ensure seller reference
     const productCount = await Product.countDocuments();
     if (productCount === 0) {
-      await Product.insertMany(sampleProducts);
-      console.log(`🌿 Seeded ${sampleProducts.length} Pisawat Spices products into MongoDB!`);
+      const productsWithSeller = sampleProducts.map(p => ({
+        ...p,
+        seller: sellerUser._id,
+        sellerName: 'Royal Pisawat Spices'
+      }));
+      await Product.insertMany(productsWithSeller);
+      console.log(`🌿 Seeded ${sampleProducts.length} Pisawat Spices products with Seller attribution into MongoDB!`);
     } else {
-      console.log(`📦 Database already has ${productCount} products.`);
+      // Update any products missing seller
+      await Product.updateMany(
+        { seller: { $exists: false } },
+        { $set: { seller: sellerUser._id, sellerName: 'Royal Pisawat Spices' } }
+      );
     }
 
-    // Seed Sample Enquiry if none exist
+    // 5. Seed Coupons
+    const couponCount = await Coupon.countDocuments();
+    if (couponCount === 0) {
+      const sampleCoupons = [
+        {
+          code: 'SPICE20',
+          title: '20% Mega Spice Discount',
+          description: 'Get 20% off on authentic stone-ground spices on orders above ₹200',
+          discountType: 'percentage',
+          discountAmount: 20,
+          minOrderAmount: 200,
+          maxDiscount: 100,
+          isActive: true,
+          createdBy: adminUser._id,
+          createdByRole: 'admin'
+        },
+        {
+          code: 'FLAT50',
+          title: 'Flat ₹50 Festival Savings',
+          description: 'Save flat ₹50 on any cart total of ₹250 or more',
+          discountType: 'fixed',
+          discountAmount: 50,
+          minOrderAmount: 250,
+          isActive: true,
+          createdBy: sellerUser._id,
+          createdByRole: 'seller'
+        },
+        {
+          code: 'FIRSTBUY',
+          title: 'Welcome First Order',
+          description: 'Flat ₹30 off for our first-time buyers',
+          discountType: 'fixed',
+          discountAmount: 30,
+          minOrderAmount: 99,
+          isActive: true,
+          createdBy: adminUser._id,
+          createdByRole: 'admin'
+        }
+      ];
+
+      await Coupon.insertMany(sampleCoupons);
+      console.log('🏷️ Seeded 3 pre-configured discount coupons (SPICE20, FLAT50, FIRSTBUY)!');
+    }
+
+    // 6. Sample Enquiry if none exist
     const enquiryCount = await Enquiry.countDocuments();
     if (enquiryCount === 0) {
       await Enquiry.create({
@@ -246,7 +324,7 @@ export const seedDatabase = async () => {
       console.log('✉️ Sample wholesale enquiry seeded.');
     }
 
-    console.log('✅ Database initialization completed!');
+    console.log('✅ Multi-Role (Buyer, Seller, Admin) database initialization completed!');
   } catch (error) {
     console.error('❌ Error seeding database:', error.message);
   }

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Filter, Sparkles, Check } from 'lucide-react';
+import { ShoppingCart, Search, Filter, Sparkles, Check, Heart, Store } from 'lucide-react';
 import { productAPI } from '../services/api';
 import { productsData as fallbackData } from '../data/productsData';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Products({ onSelectProduct }) {
   const [products, setProducts] = useState([]);
@@ -10,6 +11,7 @@ export default function Products({ onSelectProduct }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const { addToCart } = useCart();
+  const { toggleWishlist, isInWishlist } = useAuth();
 
   useEffect(() => {
     fetchProducts();
@@ -112,26 +114,54 @@ export default function Products({ onSelectProduct }) {
           {filteredProducts.map((item) => {
             const price = item.price || 99;
             const originalPrice = item.originalPrice || Math.round(price * 1.25);
+            const inWishlist = isInWishlist(item._id || item.slug || item.id);
 
             return (
               <div
                 key={item._id || item.id || item.slug}
                 className={`bg-gradient-to-br ${item.bgColor || 'from-amber-500/20 to-amber-700/10'} border ${
                   item.borderColor || 'border-amber-500/40'
-                } rounded-2xl p-5 transition duration-300 hover:-translate-y-1.5 flex flex-col justify-between shadow-xl`}
+                } rounded-2xl p-5 transition duration-300 hover:-translate-y-1.5 flex flex-col justify-between shadow-xl relative group`}
               >
                 <div>
                   {/* Product Image */}
-                  <div className="w-full h-48 overflow-hidden rounded-xl mb-4 border border-white/10 relative group bg-black/40">
+                  <div className="w-full h-48 overflow-hidden rounded-xl mb-4 border border-white/10 relative bg-black/40">
                     <img
                       src={item.image}
                       alt={item.name}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
-                    <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-[10px] text-gray-300 font-mono">
+
+                    {/* Wishlist Heart Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleWishlist(item);
+                      }}
+                      className={`absolute top-2.5 left-2.5 p-2 rounded-full backdrop-blur-md transition-all cursor-pointer ${
+                        inWishlist
+                          ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 scale-110'
+                          : 'bg-black/60 text-gray-300 hover:text-rose-400 hover:bg-black/80'
+                      }`}
+                      title={inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                    >
+                      <Heart className={`w-4 h-4 ${inWishlist ? 'fill-current' : ''}`} />
+                    </button>
+
+                    {/* Rating Badge */}
+                    <div className="absolute top-2.5 right-2.5 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/10 text-[10px] text-amber-300 font-bold">
                       ★ {item.rating || 4.9}
                     </div>
+
+                    {/* Out of Stock Ribbon */}
+                    {item.inStock === false && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
+                        <span className="px-3 py-1 rounded-full bg-rose-500 text-white font-extrabold text-xs uppercase tracking-wider">
+                          Out of Stock
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Header tags & Price */}
@@ -156,16 +186,23 @@ export default function Products({ onSelectProduct }) {
                   </div>
 
                   <h4 className="text-xl font-bold text-white mb-1">{item.name}</h4>
-                  <p className={`text-xs font-semibold ${item.textColor || 'text-amber-400'} mb-3`}>
+                  <p className={`text-xs font-semibold ${item.textColor || 'text-amber-400'} mb-1.5`}>
                     {item.subTitle}
                   </p>
-                  <p className="text-sm text-gray-300 leading-relaxed mb-4 line-clamp-2">
+
+                  {/* Seller attribution */}
+                  <div className="flex items-center gap-1 text-[11px] text-gray-400 mb-2.5">
+                    <Store className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>Seller: <strong className="text-gray-300">{item.sellerName || 'Pisawat Spices'}</strong></span>
+                  </div>
+
+                  <p className="text-xs text-gray-300 leading-relaxed mb-4 line-clamp-2">
                     {item.description}
                   </p>
 
                   {/* Highlights */}
                   {item.whyChoose && item.whyChoose.length > 0 && (
-                    <div className="space-y-1.5 mb-6">
+                    <div className="space-y-1.5 mb-5">
                       {item.whyChoose.slice(0, 3).map((feat, idx) => (
                         <div key={idx} className="flex items-center text-xs text-gray-300">
                           <Check className="w-3.5 h-3.5 text-amber-400 mr-2 flex-shrink-0" />
@@ -179,11 +216,12 @@ export default function Products({ onSelectProduct }) {
                 {/* Actions */}
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <button
+                    disabled={item.inStock === false}
                     onClick={() => addToCart(item, 1)}
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-black text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 cursor-pointer"
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-bold py-2.5 rounded-xl transition flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 cursor-pointer"
                   >
                     <ShoppingCart className="w-4 h-4" />
-                    <span>Add to Cart (₹{price})</span>
+                    <span>{item.inStock === false ? 'Out of Stock' : `Add to Cart (₹${price})`}</span>
                   </button>
 
                   <button

@@ -42,6 +42,15 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    seller: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: false
+    },
+    sellerName: {
+      type: String,
+      default: 'Pisawat Official'
+    },
     bgColor: {
       type: String,
       default: 'from-amber-500/20 to-amber-700/10'
@@ -80,11 +89,11 @@ const productSchema = new mongoose.Schema(
     },
     rating: {
       type: Number,
-      default: 4.9
+      default: 4.8
     },
     reviewsCount: {
       type: Number,
-      default: 48
+      default: 24
     }
   },
   {
