@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
 // API Root / Health Check
-app.get('/api/health', (req, res) => {
+app.get('/', (req, res) => {
   res.status(200).json({
     status: 'ok',
     service: 'Pisawat Spices Backend API',
@@ -42,6 +42,8 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
